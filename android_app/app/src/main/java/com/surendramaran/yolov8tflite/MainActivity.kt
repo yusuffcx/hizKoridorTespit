@@ -1,4 +1,3 @@
-
 package com.surendramaran.yolov8tflite
 
 import android.content.Intent
@@ -19,6 +18,13 @@ class MainActivity : AppCompatActivity() {
         binding.speedCameraDetectionButton.setOnClickListener {
             // DetectionActivity'yi başlat
             val intent = Intent(this, DetectionActivity::class.java)
+            startActivity(intent)
+        }
+
+        // Ayarlar butonuna tıklama olayını ekleyelim
+        binding.settingsButton.setOnClickListener {
+            // SettingsActivity'yi başlat
+            val intent = Intent(this, SettingsActivity::class.java)
             startActivity(intent)
         }
     }

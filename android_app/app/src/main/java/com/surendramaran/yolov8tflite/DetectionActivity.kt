@@ -1,13 +1,15 @@
 package com.surendramaran.yolov8tflite
 
-import android.view.View
 import android.Manifest
-import android.media.MediaPlayer
+import android.content.Context
+import android.content.SharedPreferences
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.Matrix
+import android.media.MediaPlayer
 import android.os.Bundle
 import android.util.Log
+import android.view.View
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.camera.core.AspectRatio
@@ -34,22 +36,24 @@ class DetectionActivity : AppCompatActivity(), Detector.DetectorListener {
     private var cameraProvider: ProcessCameraProvider? = null
     private lateinit var detector: Detector
     private var mediaPlayer: MediaPlayer? = null
-    private var lastBeepTime = 0L
-    private lateinit var cameraExecutor: ExecutorService
     private var corridorBeepCount = 0
-
-
-
+    private lateinit var cameraExecutor: ExecutorService
+    private lateinit var sharedPreferences: SharedPreferences
+    private lateinit var selectedVehicleType: String
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityDetectionBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        mediaPlayer = MediaPlayer.create(this, R.raw.hiz_koridor_algilandi)
+        // SharedPreferences'dan araç tipini al
+        sharedPreferences = getSharedPreferences(SettingsActivity.PREF_NAME, Context.MODE_PRIVATE)
+        selectedVehicleType = sharedPreferences.getString(
+            SettingsActivity.KEY_VEHICLE_TYPE,
+            SettingsActivity.VEHICLE_TYPE_CAR
+        ) ?: SettingsActivity.VEHICLE_TYPE_CAR
 
-        binding = ActivityDetectionBinding.inflate(layoutInflater)
-        setContentView(binding.root)
+        mediaPlayer = MediaPlayer.create(this, R.raw.hiz_koridor_algilandi)
 
         detector = Detector(baseContext, MODEL_PATH, LABELS_PATH, this)
         detector.setup()
@@ -168,6 +172,12 @@ class DetectionActivity : AppCompatActivity(), Detector.DetectorListener {
 
     override fun onResume() {
         super.onResume()
+        // Ayarlar değişmiş olabilir, tekrar kontrol et
+        selectedVehicleType = sharedPreferences.getString(
+            SettingsActivity.KEY_VEHICLE_TYPE,
+            SettingsActivity.VEHICLE_TYPE_CAR
+        ) ?: SettingsActivity.VEHICLE_TYPE_CAR
+
         if (allPermissionsGranted()){
             startCamera()
         } else {
@@ -192,7 +202,7 @@ class DetectionActivity : AppCompatActivity(), Detector.DetectorListener {
             binding.inferenceTime.text = "${inferenceTime}ms"
 
             // Değişkenler tanımlayalım
-            var carSpeedLimit = 0
+            var speedLimit = 0
             var isSpeedCorridor = false
 
             // Algılanan nesneleri kontrol edelim
@@ -202,14 +212,14 @@ class DetectionActivity : AppCompatActivity(), Detector.DetectorListener {
                     isSpeedCorridor = true
                 }
 
-                // Sadece araba hız sınırı tabelalarını kontrol edelim
-                if (box.clsName.startsWith("araba_")) {
+                // Seçilen araç tipine göre hız sınırı tabelalarını kontrol edelim
+                if (box.clsName.startsWith("${selectedVehicleType}_")) {
                     // Etiketin sonundaki sayıyı alalım
                     val parts = box.clsName.split("_")
                     if (parts.size > 1) {
                         try {
                             val limit = parts[1].toInt()
-                            carSpeedLimit = limit
+                            speedLimit = limit
                         } catch (e: Exception) {
                             Log.e("DetectionActivity", "Hız değeri dönüştürülemedi: ${parts[1]}")
                         }
@@ -232,9 +242,9 @@ class DetectionActivity : AppCompatActivity(), Detector.DetectorListener {
                 corridorBeepCount = 0
             }
 
-            if (carSpeedLimit > 0) {
+            if (speedLimit > 0) {
                 binding.speedLimitIcon.visibility = View.VISIBLE
-                binding.speedLimitText.text = carSpeedLimit.toString()
+                binding.speedLimitText.text = speedLimit.toString()
             } else {
                 binding.speedLimitIcon.visibility = View.INVISIBLE
             }
@@ -245,4 +255,4 @@ class DetectionActivity : AppCompatActivity(), Detector.DetectorListener {
             }
         }
     }
-    }
+}
