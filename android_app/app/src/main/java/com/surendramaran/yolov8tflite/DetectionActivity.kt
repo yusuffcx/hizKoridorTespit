@@ -1,5 +1,6 @@
 package com.surendramaran.yolov8tflite
 
+import android.view.View
 import android.Manifest
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
@@ -167,6 +168,47 @@ class DetectionActivity : AppCompatActivity(), Detector.DetectorListener {
     override fun onDetect(boundingBoxes: List<BoundingBox>, inferenceTime: Long) {
         runOnUiThread {
             binding.inferenceTime.text = "${inferenceTime}ms"
+
+            // Değişkenler tanımlayalım
+            var carSpeedLimit = 0
+            var isSpeedCorridor = false
+
+            // Algılanan nesneleri kontrol edelim
+            for (box in boundingBoxes) {
+                // Hız koridoru tabelası algılandı mı?
+                if (box.clsName == "hiz_koridoru_tabela") {
+                    isSpeedCorridor = true
+                }
+
+                // Sadece araba hız sınırı tabelalarını kontrol edelim
+                if (box.clsName.startsWith("araba_")) {
+                    // Etiketin sonundaki sayıyı alalım
+                    val parts = box.clsName.split("_")
+                    if (parts.size > 1) {
+                        try {
+                            val limit = parts[1].toInt()
+                            carSpeedLimit = limit
+                        } catch (e: Exception) {
+                            Log.e("DetectionActivity", "Hız değeri dönüştürülemedi: ${parts[1]}")
+                        }
+                    }
+                }
+            }
+
+            // UI'ı güncelleyelim
+            if (isSpeedCorridor) {
+                binding.corridorText.visibility = View.VISIBLE
+            } else {
+                binding.corridorText.visibility = View.INVISIBLE
+            }
+
+            if (carSpeedLimit > 0) {
+                binding.speedLimitIcon.visibility = View.VISIBLE
+                binding.speedLimitText.text = carSpeedLimit.toString()
+            } else {
+                binding.speedLimitIcon.visibility = View.INVISIBLE
+            }
+
             binding.overlay.apply {
                 setResults(boundingBoxes)
                 invalidate()
