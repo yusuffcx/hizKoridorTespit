@@ -2,6 +2,7 @@ package com.surendramaran.yolov8tflite
 
 import android.view.View
 import android.Manifest
+import android.media.MediaPlayer
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.Matrix
@@ -32,11 +33,21 @@ class DetectionActivity : AppCompatActivity(), Detector.DetectorListener {
     private var camera: Camera? = null
     private var cameraProvider: ProcessCameraProvider? = null
     private lateinit var detector: Detector
-
+    private var mediaPlayer: MediaPlayer? = null
+    private var lastBeepTime = 0L
     private lateinit var cameraExecutor: ExecutorService
+    private var corridorBeepCount = 0
+
+
+
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        binding = ActivityDetectionBinding.inflate(layoutInflater)
+        setContentView(binding.root)
+
+        mediaPlayer = MediaPlayer.create(this, R.raw.hiz_koridor_algilandi)
+
         binding = ActivityDetectionBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
@@ -129,6 +140,15 @@ class DetectionActivity : AppCompatActivity(), Detector.DetectorListener {
         }
     }
 
+    private fun playBeepSound() {
+        try {
+            mediaPlayer?.seekTo(0)
+            mediaPlayer?.start()
+        } catch (e: Exception) {
+            Log.e("DetectionActivity", "Ses çalma hatası", e)
+        }
+    }
+
     private fun allPermissionsGranted() = REQUIRED_PERMISSIONS.all {
         ContextCompat.checkSelfPermission(baseContext, it) == PackageManager.PERMISSION_GRANTED
     }
@@ -140,6 +160,8 @@ class DetectionActivity : AppCompatActivity(), Detector.DetectorListener {
 
     override fun onDestroy() {
         super.onDestroy()
+        mediaPlayer?.release()
+        mediaPlayer = null
         detector.clear()
         cameraExecutor.shutdown()
     }
@@ -198,8 +220,16 @@ class DetectionActivity : AppCompatActivity(), Detector.DetectorListener {
             // UI'ı güncelleyelim
             if (isSpeedCorridor) {
                 binding.corridorText.visibility = View.VISIBLE
+
+                // Sadece iki kez ses çalacak
+                if (corridorBeepCount < 2) {
+                    playBeepSound()
+                    corridorBeepCount++
+                }
             } else {
                 binding.corridorText.visibility = View.INVISIBLE
+                // Hız koridoru algılaması bitince sayacı sıfırla
+                corridorBeepCount = 0
             }
 
             if (carSpeedLimit > 0) {
@@ -215,4 +245,4 @@ class DetectionActivity : AppCompatActivity(), Detector.DetectorListener {
             }
         }
     }
-}
+    }
