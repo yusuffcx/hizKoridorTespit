@@ -1,12 +1,16 @@
 package com.surendramaran.yolov8tflite
 
 import android.Manifest
+import android.annotation.SuppressLint
 import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.Matrix
+import android.location.Location
+import android.location.LocationListener
+import android.location.LocationManager
 import android.media.MediaPlayer
 import android.os.Bundle
 import android.util.Log
@@ -27,7 +31,7 @@ import com.surendramaran.yolov8tflite.databinding.ActivityDetectionBinding
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 
-class DetectionActivity : AppCompatActivity(), Detector.DetectorListener {
+class DetectionActivity : AppCompatActivity(), Detector.DetectorListener, LocationListener {
     private lateinit var binding: ActivityDetectionBinding
     private val isFrontCamera = false
 
@@ -38,14 +42,29 @@ class DetectionActivity : AppCompatActivity(), Detector.DetectorListener {
     private lateinit var detector: Detector
     private var mediaPlayer: MediaPlayer? = null
     private var corridorBeepCount = 0
+
     private lateinit var cameraExecutor: ExecutorService
     private lateinit var sharedPreferences: SharedPreferences
     private lateinit var selectedVehicleType: String
+
+    private lateinit var locationManager : LocationManager
+    private var currentSpeed = 120f
+    private var isSpeedingWarningShown = false
+
+    // Yeni eklenen değişken
+    private var currentDetectedSpeedLimit = 0
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityDetectionBinding.inflate(layoutInflater)
         setContentView(binding.root)
+
+        if (allPermissionsGranted()) {
+            startCamera()
+            startLocationUpdates() // Konum güncellemelerini başlat
+        } else {
+            requestPermissionLauncher.launch(REQUIRED_PERMISSIONS)
+        }
 
         // SharedPreferences'dan araç tipini al
         sharedPreferences = getSharedPreferences(SettingsActivity.PREF_NAME, Context.MODE_PRIVATE)
@@ -66,6 +85,77 @@ class DetectionActivity : AppCompatActivity(), Detector.DetectorListener {
         }
 
         cameraExecutor = Executors.newSingleThreadExecutor()
+    }
+
+    @SuppressLint("MissingPermission")
+    private fun startLocationUpdates() {
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
+            locationManager = getSystemService(Context.LOCATION_SERVICE) as LocationManager
+            locationManager.requestLocationUpdates(
+                LocationManager.GPS_PROVIDER,
+                1000L, // 1 saniye
+                1f,
+                this// 1 metre
+            )
+        }
+    }
+
+    // LocationListener metodları
+    override fun onLocationChanged(location: Location) {
+        // Hız m/s cinsinden geliyor, km/h'ye çeviriyoruz
+        val speedMS = location.speed
+        currentSpeed = speedMS * 3.6f // m/s'yi km/h'ye çevir
+
+        // Hız değerini ekranda göster
+        binding.currentSpeedText.text = "Mevcut Hız: ${currentSpeed.toInt()} km/h"
+        binding.currentSpeedText.visibility = View.VISIBLE
+
+        // Hız sınırı aşıldı mı kontrol et
+        checkSpeedLimit()
+    }
+
+    // Diğer LocationListener metodları (Android 9 için gerekli olabilir)
+    override fun onStatusChanged(provider: String?, status: Int, extras: Bundle?) {}
+    override fun onProviderEnabled(provider: String) {}
+    override fun onProviderDisabled(provider: String) {}
+
+    // Güncellenen metod
+    private fun getSpeedLimitFromDetections(): Int {
+        return currentDetectedSpeedLimit
+    }
+
+    // İzin isteme işlemi için REQUIRED_PERMISSIONS'ı güncelleyelim
+    companion object {
+        private const val TAG = "Detection"
+        private const val REQUEST_CODE_PERMISSIONS = 10
+        private val REQUIRED_PERMISSIONS = mutableListOf(
+            Manifest.permission.CAMERA,
+            Manifest.permission.ACCESS_FINE_LOCATION,
+            Manifest.permission.ACCESS_COARSE_LOCATION
+        ).toTypedArray()
+    }
+
+    // Güncellenen checkSpeedLimit metodu
+    private fun checkSpeedLimit() {
+        val speedLimit = getSpeedLimitFromDetections()
+
+        Log.d(TAG, "Checking speed limit: Current speed $currentSpeed, Speed limit $speedLimit")
+
+        if (speedLimit > 0 && currentSpeed > speedLimit) {
+            // Hız sınırı aşıldı
+            Log.d(TAG, "Speed limit exceeded!")
+            if (!isSpeedingWarningShown) {
+                binding.speedWarningText.visibility = View.VISIBLE
+                isSpeedingWarningShown = true
+            }
+        } else {
+            // Hız sınırı aşılmadı
+            Log.d(TAG, "Speed within limits")
+            if (isSpeedingWarningShown) {
+                binding.speedWarningText.visibility = View.INVISIBLE
+                isSpeedingWarningShown = false
+            }
+        }
     }
 
     private fun startCamera() {
@@ -229,14 +319,6 @@ class DetectionActivity : AppCompatActivity(), Detector.DetectorListener {
         }
     }
 
-    companion object {
-        private const val TAG = "Detection"
-        private const val REQUEST_CODE_PERMISSIONS = 10
-        private val REQUIRED_PERMISSIONS = mutableListOf(
-            Manifest.permission.CAMERA
-        ).toTypedArray()
-    }
-
     override fun onEmptyDetect() {
         try {
             binding.overlay.invalidate()
@@ -269,6 +351,10 @@ class DetectionActivity : AppCompatActivity(), Detector.DetectorListener {
                             try {
                                 val limit = parts[1].toInt()
                                 speedLimit = limit
+                                // Yeni eklenen kod - hız sınırını güncelle
+                                currentDetectedSpeedLimit = limit
+                                // Hız sınırı kontrolünü çağır
+                                checkSpeedLimit()
                             } catch (e: Exception) {
                                 Log.e("DetectionActivity", "Hız değeri dönüştürülemedi: ${parts[1]}")
                             }

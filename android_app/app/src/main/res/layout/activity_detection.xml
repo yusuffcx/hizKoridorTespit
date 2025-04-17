@@ -32,6 +32,25 @@
         app:layout_constraintTop_toTopOf="parent"
         tools:text="50ms" />
 
+    <!-- Mevcut hız göstergesi -->
+    <TextView
+        android:id="@+id/currentSpeedText"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="16dp"
+        android:layout_marginBottom="16dp"
+        android:textColor="@android:color/white"
+        android:textSize="16sp"
+        android:textStyle="bold"
+        android:background="#80000000"
+        android:padding="8dp"
+        android:visibility="invisible"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintBottom_toBottomOf="parent"
+        tools:text="Mevcut Hız: 75 km/h" />
+
+
+
     <!-- Hız Koridoru Metni -->
     <TextView
         android:id="@+id/corridorText"
