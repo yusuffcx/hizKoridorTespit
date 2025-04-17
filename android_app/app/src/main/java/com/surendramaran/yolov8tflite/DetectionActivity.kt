@@ -48,7 +48,7 @@ class DetectionActivity : AppCompatActivity(), Detector.DetectorListener, Locati
     private lateinit var selectedVehicleType: String
 
     private lateinit var locationManager : LocationManager
-    private var currentSpeed = 120f
+    private var currentSpeed = 0f
     private var isSpeedingWarningShown = false
 //
     // Yeni eklenen değişken
