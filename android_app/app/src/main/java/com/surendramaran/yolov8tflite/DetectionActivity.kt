@@ -2,6 +2,7 @@ package com.surendramaran.yolov8tflite
 
 import android.Manifest
 import android.content.Context
+import android.content.Intent
 import android.content.SharedPreferences
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
@@ -70,7 +71,7 @@ class DetectionActivity : AppCompatActivity(), Detector.DetectorListener {
     private fun startCamera() {
         val cameraProviderFuture = ProcessCameraProvider.getInstance(this)
         cameraProviderFuture.addListener({
-            cameraProvider  = cameraProviderFuture.get()
+            cameraProvider = cameraProviderFuture.get()
             bindCameraUseCases()
         }, ContextCompat.getMainExecutor(this))
     }
@@ -85,7 +86,7 @@ class DetectionActivity : AppCompatActivity(), Detector.DetectorListener {
             .requireLensFacing(CameraSelector.LENS_FACING_BACK)
             .build()
 
-        preview =  Preview.Builder()
+        preview = Preview.Builder()
             .setTargetAspectRatio(AspectRatio.RATIO_4_3)
             .setTargetRotation(rotation)
             .build()
@@ -139,7 +140,7 @@ class DetectionActivity : AppCompatActivity(), Detector.DetectorListener {
             )
 
             preview?.setSurfaceProvider(binding.viewFinder.surfaceProvider)
-        } catch(exc: Exception) {
+        } catch (exc: Exception) {
             Log.e(TAG, "Use case binding failed", exc)
         }
     }
@@ -158,101 +159,152 @@ class DetectionActivity : AppCompatActivity(), Detector.DetectorListener {
     }
 
     private val requestPermissionLauncher = registerForActivityResult(
-        ActivityResultContracts.RequestMultiplePermissions()) {
-        if (it[Manifest.permission.CAMERA] == true) { startCamera() }
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) {
+        if (it[Manifest.permission.CAMERA] == true) {
+            startCamera()
+        }
     }
 
     override fun onDestroy() {
-        super.onDestroy()
-        mediaPlayer?.release()
-        mediaPlayer = null
-        detector.clear()
-        cameraExecutor.shutdown()
+        try {
+            super.onDestroy()
+            // Kaynakları temizle
+            mediaPlayer?.release()
+            mediaPlayer = null
+            camera = null
+            cameraProvider?.unbindAll()
+            detector.clear()
+            cameraExecutor.shutdown()
+        } catch (e: Exception) {
+            Log.e(TAG, "Error during onDestroy", e)
+        }
+    }
+
+    // Geri tuşuna basıldığında
+    @Deprecated("Deprecated in Java")
+    override fun onBackPressed() {
+        try {
+            // Kamera kaynaklarını temizle
+            camera = null
+            cameraProvider?.unbindAll()
+
+            // Ana ekrana dön
+            val intent = Intent(this, MainActivity::class.java)
+            intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
+            startActivity(intent)
+            finish()
+        } catch (e: Exception) {
+            Log.e(TAG, "Error during back navigation", e)
+            super.onBackPressed() // Yine de normal işleme devam et
+        }
+    }
+
+    override fun onPause() {
+        super.onPause()
+        try {
+            // Kamera işlemlerini durdur
+            cameraProvider?.unbindAll()
+        } catch (e: Exception) {
+            Log.e(TAG, "Error during onPause", e)
+        }
     }
 
     override fun onResume() {
         super.onResume()
-        // Ayarlar değişmiş olabilir, tekrar kontrol et
-        selectedVehicleType = sharedPreferences.getString(
-            SettingsActivity.KEY_VEHICLE_TYPE,
-            SettingsActivity.VEHICLE_TYPE_CAR
-        ) ?: SettingsActivity.VEHICLE_TYPE_CAR
+        try {
+            // Ayarlar değişmiş olabilir, tekrar kontrol et
+            selectedVehicleType = sharedPreferences.getString(
+                SettingsActivity.KEY_VEHICLE_TYPE,
+                SettingsActivity.VEHICLE_TYPE_CAR
+            ) ?: SettingsActivity.VEHICLE_TYPE_CAR
 
-        if (allPermissionsGranted()){
-            startCamera()
-        } else {
-            requestPermissionLauncher.launch(REQUIRED_PERMISSIONS)
+            if (allPermissionsGranted()) {
+                startCamera()
+            } else {
+                requestPermissionLauncher.launch(REQUIRED_PERMISSIONS)
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error during onResume", e)
         }
     }
 
     companion object {
         private const val TAG = "Detection"
         private const val REQUEST_CODE_PERMISSIONS = 10
-        private val REQUIRED_PERMISSIONS = mutableListOf (
+        private val REQUIRED_PERMISSIONS = mutableListOf(
             Manifest.permission.CAMERA
         ).toTypedArray()
     }
 
     override fun onEmptyDetect() {
-        binding.overlay.invalidate()
+        try {
+            binding.overlay.invalidate()
+        } catch (e: Exception) {
+            Log.e(TAG, "Error during onEmptyDetect", e)
+        }
     }
 
     override fun onDetect(boundingBoxes: List<BoundingBox>, inferenceTime: Long) {
-        runOnUiThread {
-            binding.inferenceTime.text = "${inferenceTime}ms"
+        try {
+            runOnUiThread {
+                binding.inferenceTime.text = "${inferenceTime}ms"
 
-            // Değişkenler tanımlayalım
-            var speedLimit = 0
-            var isSpeedCorridor = false
+                // Değişkenler tanımlayalım
+                var speedLimit = 0
+                var isSpeedCorridor = false
 
-            // Algılanan nesneleri kontrol edelim
-            for (box in boundingBoxes) {
-                // Hız koridoru tabelası algılandı mı?
-                if (box.clsName == "hiz_koridoru_tabela") {
-                    isSpeedCorridor = true
-                }
+                // Algılanan nesneleri kontrol edelim
+                for (box in boundingBoxes) {
+                    // Hız koridoru tabelası algılandı mı?
+                    if (box.clsName == "hiz_koridoru_tabela") {
+                        isSpeedCorridor = true
+                    }
 
-                // Seçilen araç tipine göre hız sınırı tabelalarını kontrol edelim
-                if (box.clsName.startsWith("${selectedVehicleType}_")) {
-                    // Etiketin sonundaki sayıyı alalım
-                    val parts = box.clsName.split("_")
-                    if (parts.size > 1) {
-                        try {
-                            val limit = parts[1].toInt()
-                            speedLimit = limit
-                        } catch (e: Exception) {
-                            Log.e("DetectionActivity", "Hız değeri dönüştürülemedi: ${parts[1]}")
+                    // Seçilen araç tipine göre hız sınırı tabelalarını kontrol edelim
+                    if (box.clsName.startsWith("${selectedVehicleType}_")) {
+                        // Etiketin sonundaki sayıyı alalım
+                        val parts = box.clsName.split("_")
+                        if (parts.size > 1) {
+                            try {
+                                val limit = parts[1].toInt()
+                                speedLimit = limit
+                            } catch (e: Exception) {
+                                Log.e("DetectionActivity", "Hız değeri dönüştürülemedi: ${parts[1]}")
+                            }
                         }
                     }
                 }
-            }
 
-            // UI'ı güncelleyelim
-            if (isSpeedCorridor) {
-                binding.corridorText.visibility = View.VISIBLE
+                // UI'ı güncelleyelim
+                if (isSpeedCorridor) {
+                    binding.corridorText.visibility = View.VISIBLE
 
-                // Sadece iki kez ses çalacak
-                if (corridorBeepCount < 2) {
-                    playBeepSound()
-                    corridorBeepCount++
+                    // Sadece iki kez ses çalacak
+                    if (corridorBeepCount < 2) {
+                        playBeepSound()
+                        corridorBeepCount++
+                    }
+                } else {
+                    binding.corridorText.visibility = View.INVISIBLE
+                    // Hız koridoru algılaması bitince sayacı sıfırla
+                    corridorBeepCount = 0
                 }
-            } else {
-                binding.corridorText.visibility = View.INVISIBLE
-                // Hız koridoru algılaması bitince sayacı sıfırla
-                corridorBeepCount = 0
-            }
 
-            if (speedLimit > 0) {
-                binding.speedLimitIcon.visibility = View.VISIBLE
-                binding.speedLimitText.text = speedLimit.toString()
-            } else {
-                binding.speedLimitIcon.visibility = View.INVISIBLE
-            }
+                if (speedLimit > 0) {
+                    binding.speedLimitIcon.visibility = View.VISIBLE
+                    binding.speedLimitText.text = speedLimit.toString()
+                } else {
+                    binding.speedLimitIcon.visibility = View.INVISIBLE
+                }
 
-            binding.overlay.apply {
-                setResults(boundingBoxes)
-                invalidate()
+                binding.overlay.apply {
+                    setResults(boundingBoxes)
+                    invalidate()
+                }
             }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error during onDetect", e)
         }
     }
 }
