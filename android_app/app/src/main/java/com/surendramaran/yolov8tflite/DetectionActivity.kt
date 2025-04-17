@@ -50,7 +50,7 @@ class DetectionActivity : AppCompatActivity(), Detector.DetectorListener, Locati
     private lateinit var locationManager : LocationManager
     private var currentSpeed = 120f
     private var isSpeedingWarningShown = false
-
+//
     // Yeni eklenen değişken
     private var currentDetectedSpeedLimit = 0
 
