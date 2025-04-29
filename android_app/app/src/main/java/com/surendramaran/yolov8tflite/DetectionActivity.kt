@@ -7,6 +7,7 @@ import android.content.Intent
 import android.content.SharedPreferences
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
+import android.graphics.Color
 import android.graphics.Matrix
 import android.location.Location
 import android.location.LocationListener
@@ -30,6 +31,8 @@ import com.surendramaran.yolov8tflite.Constants.MODEL_PATH
 import com.surendramaran.yolov8tflite.databinding.ActivityDetectionBinding
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
+import java.util.Timer
+import java.util.TimerTask
 
 class DetectionActivity : AppCompatActivity(), Detector.DetectorListener, LocationListener {
     private lateinit var binding: ActivityDetectionBinding
@@ -50,14 +53,20 @@ class DetectionActivity : AppCompatActivity(), Detector.DetectorListener, Locati
     private lateinit var locationManager : LocationManager
     private var currentSpeed = 0f
     private var isSpeedingWarningShown = false
-//
+
     // Yeni eklenen değişken
     private var currentDetectedSpeedLimit = 0
+    // Hız göstergesi güncelleme zamanı
+    private var lastSpeedUpdateTime = 0L
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityDetectionBinding.inflate(layoutInflater)
         setContentView(binding.root)
+
+        // Hız göstergesini başlangıçta görünür yap ve 0 değeri göster
+        binding.speedMeterCard.visibility = View.VISIBLE
+        binding.currentSpeedText.text = "0"
 
         if (allPermissionsGranted()) {
             startCamera()
@@ -90,28 +99,66 @@ class DetectionActivity : AppCompatActivity(), Detector.DetectorListener, Locati
     @SuppressLint("MissingPermission")
     private fun startLocationUpdates() {
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
-            locationManager = getSystemService(Context.LOCATION_SERVICE) as LocationManager
-            locationManager.requestLocationUpdates(
-                LocationManager.GPS_PROVIDER,
-                1000L, // 1 saniye
-                1f,
-                this// 1 metre
-            )
+            try {
+                Log.d(TAG, "Konum güncellemeleri başlatılıyor")
+                locationManager = getSystemService(Context.LOCATION_SERVICE) as LocationManager
+
+                // GPS aktif mi kontrol et
+                val isGPSEnabled = locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER)
+                Log.d(TAG, "GPS aktif mi: $isGPSEnabled")
+
+                locationManager.requestLocationUpdates(
+                    LocationManager.GPS_PROVIDER,
+                    1000L, // 1 saniye
+                    1f,    // 1 metre
+                    this
+                )
+                Log.d(TAG, "Konum güncellemeleri için istek yapıldı")
+            } catch (e: Exception) {
+                Log.e(TAG, "Konum güncellemeleri başlatılamadı: ${e.message}")
+            }
+        } else {
+            Log.d(TAG, "Konum izni verilmedi")
         }
     }
 
     // LocationListener metodları
     override fun onLocationChanged(location: Location) {
-        // Hız m/s cinsinden geliyor, km/h'ye çeviriyoruz
-        val speedMS = location.speed
-        currentSpeed = speedMS * 3.6f // m/s'yi km/h'ye çevir
+        try {
+            // Çok sık güncelleme yapmamak için kontrol
+            val currentTime = System.currentTimeMillis()
+            if (currentTime - lastSpeedUpdateTime < 500) { // 500ms'den kısa sürede güncelleme yapma
+                return
+            }
+            lastSpeedUpdateTime = currentTime
 
-        // Hız değerini ekranda göster
-        binding.currentSpeedText.text = "Mevcut Hız: ${currentSpeed.toInt()} km/h"
-        binding.currentSpeedText.visibility = View.VISIBLE
+            // Hız m/s cinsinden geliyor, km/h'ye çeviriyoruz
+            val speedMS = location.speed
+            currentSpeed = speedMS * 3.6f // m/s'yi km/h'ye çevir
 
-        // Hız sınırı aşıldı mı kontrol et
-        checkSpeedLimit()
+            // Hız değerini ekranda göster
+            runOnUiThread {
+                // Sadece hız değerini göster (km/h kısmı ayrı bir TextView'da)
+                binding.currentSpeedText.text = "${currentSpeed.toInt()}"
+
+                // Hız sınırı kontrolü
+                val speedLimit = getSpeedLimitFromDetections()
+                if (speedLimit > 0 && currentSpeed > speedLimit) {
+                    // Hız sınırı aşıldığında metin rengini kırmızı yap
+                    binding.currentSpeedText.setTextColor(Color.RED)
+                } else {
+                    // Normal hızda beyaz göster
+                    binding.currentSpeedText.setTextColor(Color.WHITE)
+                }
+            }
+
+            // Hız sınırı aşıldı mı kontrol et
+            checkSpeedLimit()
+
+            Log.d(TAG, "Güncel hız: ${currentSpeed.toInt()} km/h")
+        } catch (e: Exception) {
+            Log.e(TAG, "Hız güncellemesi sırasında hata: ${e.message}")
+        }
     }
 
     // Diğer LocationListener metodları (Android 9 için gerekli olabilir)
@@ -250,9 +297,30 @@ class DetectionActivity : AppCompatActivity(), Detector.DetectorListener, Locati
 
     private val requestPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
-    ) {
-        if (it[Manifest.permission.CAMERA] == true) {
+    ) { permissions ->
+        // Kamera izni kontrolü
+        if (permissions[Manifest.permission.CAMERA] == true) {
             startCamera()
+        }
+
+        // Konum izni kontrolü (açıkça yapılmalı)
+        if (permissions[Manifest.permission.ACCESS_FINE_LOCATION] == true ||
+            permissions[Manifest.permission.ACCESS_COARSE_LOCATION] == true) {
+            startLocationUpdates()
+            Log.d(TAG, "Konum izni verildi, konum güncellemeleri başlatılıyor")
+        } else {
+            Log.d(TAG, "Konum izni reddedildi")
+        }
+
+        // Tüm izinlerin kontrol edilmesi
+        val allGranted = REQUIRED_PERMISSIONS.all {
+            ContextCompat.checkSelfPermission(baseContext, it) == PackageManager.PERMISSION_GRANTED
+        }
+
+        if (allGranted) {
+            Log.d(TAG, "Tüm izinler verildi")
+        } else {
+            Log.d(TAG, "Bazı izinler hala eksik")
         }
     }
 
@@ -308,6 +376,16 @@ class DetectionActivity : AppCompatActivity(), Detector.DetectorListener, Locati
                 SettingsActivity.KEY_VEHICLE_TYPE,
                 SettingsActivity.VEHICLE_TYPE_CAR
             ) ?: SettingsActivity.VEHICLE_TYPE_CAR
+
+            // Speed görünür olmalı her zaman
+            binding.speedMeterCard.visibility = View.VISIBLE
+
+            // Eğer önceden kaydedilmiş bir hız varsa değerini göster, yoksa 0 göster
+            if (currentSpeed > 0) {
+                binding.currentSpeedText.text = "${currentSpeed.toInt()}"
+            } else {
+                binding.currentSpeedText.text = "0"
+            }
 
             if (allPermissionsGranted()) {
                 startCamera()

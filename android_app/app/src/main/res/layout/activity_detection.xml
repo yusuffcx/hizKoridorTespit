@@ -33,21 +33,54 @@
         tools:text="50ms" />
 
     <!-- Mevcut hız göstergesi -->
-    <TextView
-        android:id="@+id/currentSpeedText"
+    <!-- Aşağıdaki kodu activity_detection.xml dosyanızdaki mevcut currentSpeedText yerine yerleştirin -->
+
+    <!-- Hız Göstergesi Kartı -->
+    <androidx.cardview.widget.CardView
+        android:id="@+id/speedMeterCard"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_marginStart="16dp"
         android:layout_marginBottom="16dp"
-        android:textColor="@android:color/white"
-        android:textSize="16sp"
-        android:textStyle="bold"
-        android:background="#80000000"
-        android:padding="8dp"
-        android:visibility="invisible"
+        app:cardBackgroundColor="#80000000"
+        app:cardCornerRadius="12dp"
+        app:cardElevation="4dp"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintBottom_toBottomOf="parent"
-        tools:text="Mevcut Hız: 75 km/h" />
+        app:layout_constraintBottom_toBottomOf="parent">
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="8dp">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="HIZ"
+                android:textColor="#FFFFFF"
+                android:textSize="12sp"
+                android:gravity="center" />
+
+            <TextView
+                android:id="@+id/currentSpeedText"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textColor="#FFFFFF"
+                android:textSize="24sp"
+                android:textStyle="bold"
+                android:gravity="center"
+                tools:text="75" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="km/h"
+                android:textColor="#FFFFFF"
+                android:textSize="12sp"
+                android:gravity="center" />
+        </LinearLayout>
+    </androidx.cardview.widget.CardView>
 
     <!-- Hız aşımı uyarısı -->
     <TextView
