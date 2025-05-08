@@ -14,6 +14,8 @@ import android.location.LocationListener
 import android.location.LocationManager
 import android.media.MediaPlayer
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.util.Log
 import android.view.View
 import androidx.activity.result.contract.ActivityResultContracts
@@ -37,6 +39,13 @@ import java.util.TimerTask
 class DetectionActivity : AppCompatActivity(), Detector.DetectorListener, LocationListener {
     private lateinit var binding: ActivityDetectionBinding
     private val isFrontCamera = false
+
+
+    private var cameraBeep: MediaPlayer? = null  // Kamera algılandığında çalacak ses
+    private var speedValues = mutableListOf<Float>()  // Hız değerlerini saklamak için liste
+    private var avgSpeed = 0f  // Ortalama hız değeri
+    private var cameraDetectedTimestamp = 0L
+
 
     private var preview: Preview? = null
     private var imageAnalyzer: ImageAnalysis? = null
@@ -66,7 +75,14 @@ class DetectionActivity : AppCompatActivity(), Detector.DetectorListener, Locati
 
         // Hız göstergesini başlangıçta görünür yap ve 0 değeri göster
         binding.speedMeterCard.visibility = View.VISIBLE
+        binding.avgSpeedMeterCard.visibility = View.VISIBLE
         binding.currentSpeedText.text = "0"
+        binding.currentSpeedTextMS.text = "0.00"
+        binding.avgSpeedText.text = "0"
+
+        cameraBeep = MediaPlayer.create(this, R.raw.kamera_algilandi)  // raw klasörüne beep_sound.mp3 ekleyin
+
+
 
         if (allPermissionsGranted()) {
             startCamera()
@@ -110,7 +126,7 @@ class DetectionActivity : AppCompatActivity(), Detector.DetectorListener, Locati
                 locationManager.requestLocationUpdates(
                     LocationManager.GPS_PROVIDER,
                     1000L, // 1 saniye
-                    1f,    // 1 metre
+                    0f,    // 1 metre
                     this
                 )
                 Log.d(TAG, "Konum güncellemeleri için istek yapıldı")
@@ -136,10 +152,14 @@ class DetectionActivity : AppCompatActivity(), Detector.DetectorListener, Locati
             val speedMS = location.speed
             currentSpeed = speedMS * 3.6f // m/s'yi km/h'ye çevir
 
+            updateAverageSpeed(currentSpeed)
+
+
             // Hız değerini ekranda göster
             runOnUiThread {
                 // Sadece hız değerini göster (km/h kısmı ayrı bir TextView'da)
                 binding.currentSpeedText.text = "${currentSpeed.toInt()}"
+                binding.currentSpeedTextMS.text = String.format("%.2f", speedMS)
 
                 // Hız sınırı kontrolü
                 val speedLimit = getSpeedLimitFromDetections()
@@ -284,6 +304,9 @@ class DetectionActivity : AppCompatActivity(), Detector.DetectorListener, Locati
 
     private fun playBeepSound() {
         try {
+            cameraBeep?.seekTo(0)
+            cameraBeep?.start()
+
             mediaPlayer?.seekTo(0)
             mediaPlayer?.start()
         } catch (e: Exception) {
@@ -294,6 +317,34 @@ class DetectionActivity : AppCompatActivity(), Detector.DetectorListener, Locati
     private fun allPermissionsGranted() = REQUIRED_PERMISSIONS.all {
         ContextCompat.checkSelfPermission(baseContext, it) == PackageManager.PERMISSION_GRANTED
     }
+
+    private fun updateAverageSpeed(currentSpeed: Float) {
+        // Son 10 dakika içindeki hız değerlerini sakla
+        val currentTime = System.currentTimeMillis()
+        val tenMinutesAgo = currentTime - (10 * 60 * 1000)
+
+        // Hız değerini listeye ekle (zaman damgasıyla)
+        speedValues.add(currentSpeed)
+
+        // 10 dakikadan eski değerleri kaldır (gerçek uygulamada zaman damgasıyla yapabilirsiniz)
+        if (speedValues.size > 60) {  // Yaklaşık 10 dakikalık veri (10 saniyede bir güncellemeyle)
+            speedValues.removeAt(0)
+        }
+
+        // Ortalama hızı hesapla
+        avgSpeed = if (speedValues.isNotEmpty()) {
+            speedValues.sum() / speedValues.size
+        } else {
+            0f
+        }
+
+        // Ortalama hız değerini ekranda göster
+        runOnUiThread {
+            binding.avgSpeedText.text = "${avgSpeed.toInt()}"
+        }
+    }
+
+
 
     private val requestPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -331,6 +382,9 @@ class DetectionActivity : AppCompatActivity(), Detector.DetectorListener, Locati
             mediaPlayer?.release()
             mediaPlayer = null
             camera = null
+            cameraBeep?.release()
+            cameraBeep = null
+
             cameraProvider?.unbindAll()
             detector.clear()
             cameraExecutor.shutdown()
@@ -383,8 +437,12 @@ class DetectionActivity : AppCompatActivity(), Detector.DetectorListener, Locati
             // Eğer önceden kaydedilmiş bir hız varsa değerini göster, yoksa 0 göster
             if (currentSpeed > 0) {
                 binding.currentSpeedText.text = "${currentSpeed.toInt()}"
+                val lastMS = currentSpeed / 3.6f
+                binding.currentSpeedTextMS.text = String.format("%.2f", lastMS)
             } else {
                 binding.currentSpeedText.text = "0"
+                binding.currentSpeedTextMS.text = "0.00"
+
             }
 
             if (allPermissionsGranted()) {
@@ -413,12 +471,18 @@ class DetectionActivity : AppCompatActivity(), Detector.DetectorListener, Locati
                 // Değişkenler tanımlayalım
                 var speedLimit = 0
                 var isSpeedCorridor = false
+                var isCameraDetected = false
+
 
                 // Algılanan nesneleri kontrol edelim
                 for (box in boundingBoxes) {
                     // Hız koridoru tabelası algılandı mı?
                     if (box.clsName == "hiz_koridoru_tabela") {
                         isSpeedCorridor = true
+                    }
+
+                    if (box.clsName == "kamera") {
+                        isCameraDetected = true
                     }
 
                     // Seçilen araç tipine göre hız sınırı tabelalarını kontrol edelim
@@ -443,7 +507,9 @@ class DetectionActivity : AppCompatActivity(), Detector.DetectorListener, Locati
                 // UI'ı güncelleyelim
                 if (isSpeedCorridor) {
                     binding.corridorText.visibility = View.VISIBLE
-
+                    Handler(Looper.getMainLooper()).postDelayed({
+                        binding.corridorText.visibility = View.INVISIBLE
+                    }, 1000)
                     // Sadece iki kez ses çalacak
                     if (corridorBeepCount < 2) {
                         playBeepSound()
@@ -453,6 +519,25 @@ class DetectionActivity : AppCompatActivity(), Detector.DetectorListener, Locati
                     binding.corridorText.visibility = View.INVISIBLE
                     // Hız koridoru algılaması bitince sayacı sıfırla
                     corridorBeepCount = 0
+                }
+
+                if (isCameraDetected) {
+                    val currentTime = System.currentTimeMillis()
+
+                    // Kamera ilk kez algılandıysa veya son algılamadan 3 saniye geçtiyse
+                    if (currentTime - cameraDetectedTimestamp > 3000) {
+                        // Mesajı göster ve ses çal
+                        binding.cameraDetectedText.visibility = View.VISIBLE
+                        playBeepSound()
+
+                        // 1 saniye sonra mesajı gizle
+                        Handler(Looper.getMainLooper()).postDelayed({
+                            binding.cameraDetectedText.visibility = View.INVISIBLE
+                        }, 1000)
+
+                        // Zaman damgasını güncelle
+                        cameraDetectedTimestamp = currentTime
+                    }
                 }
 
                 if (speedLimit > 0) {
