@@ -18,6 +18,7 @@ import android.os.Handler
 import android.os.Looper
 import android.util.Log
 import android.view.View
+import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.camera.core.AspectRatio
@@ -45,7 +46,11 @@ class DetectionActivity : AppCompatActivity(), Detector.DetectorListener, Locati
     private var speedValues = mutableListOf<Float>()  // Hız değerlerini saklamak için liste
     private var avgSpeed = 0f  // Ortalama hız değeri
     private var cameraDetectedTimestamp = 0L
-
+    private val boundingBoxTimer = Handler(Looper.getMainLooper())
+    private val clearBoundingBoxRunable = Runnable{
+        binding.overlay.clear()
+        binding.overlay.invalidate()
+    }
 
     private var preview: Preview? = null
     private var imageAnalyzer: ImageAnalysis? = null
@@ -507,9 +512,9 @@ class DetectionActivity : AppCompatActivity(), Detector.DetectorListener, Locati
                 // UI'ı güncelleyelim
                 if (isSpeedCorridor) {
                     binding.corridorText.visibility = View.VISIBLE
-                    Handler(Looper.getMainLooper()).postDelayed({
+                    /*Handler(Looper.getMainLooper()).postDelayed({
                         binding.corridorText.visibility = View.INVISIBLE
-                    }, 1000)
+                    }, 1000) */
                     // Sadece iki kez ses çalacak
                     if (corridorBeepCount < 2) {
                         playBeepSound()
@@ -528,6 +533,11 @@ class DetectionActivity : AppCompatActivity(), Detector.DetectorListener, Locati
                     if (currentTime - cameraDetectedTimestamp > 3000) {
                         // Mesajı göster ve ses çal
                         binding.cameraDetectedText.visibility = View.VISIBLE
+
+                        runOnUiThread {
+                            Toast.makeText(this, "HIZ KORİDORU KAMERASI ALGILANDI!", Toast.LENGTH_SHORT).show()
+                        }
+
                         playBeepSound()
 
                         // 1 saniye sonra mesajı gizle
@@ -551,6 +561,9 @@ class DetectionActivity : AppCompatActivity(), Detector.DetectorListener, Locati
                     setResults(boundingBoxes)
                     invalidate()
                 }
+
+                boundingBoxTimer.removeCallbacks(clearBoundingBoxRunable)
+                boundingBoxTimer.postDelayed(clearBoundingBoxRunable, 3000)
             }
         } catch (e: Exception) {
             Log.e(TAG, "Error during onDetect", e)

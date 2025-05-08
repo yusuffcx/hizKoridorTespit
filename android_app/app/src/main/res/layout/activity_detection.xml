@@ -17,21 +17,7 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent" />
 
-    <TextView
-        android:id="@+id/cameraDetectedText"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Kamera Algılandı!"
-        android:textColor="#FFFF00"
-    android:textSize="18sp"
-    android:textStyle="bold"
-    android:background="#80000000"
-    android:padding="8dp"
-    android:visibility="invisible"
-    app:layout_constraintStart_toStartOf="parent"
-    app:layout_constraintEnd_toEndOf="parent"
-    app:layout_constraintBottom_toTopOf="@id/corridorText"
-    android:layout_marginBottom="8dp" />
+
 
 
     <TextView
@@ -196,6 +182,22 @@
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintTop_toTopOf="parent"
         android:layout_marginTop="16dp" />
+
+    <TextView
+        android:id="@+id/cameraDetectedText"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Kamera Algılandı!"
+        android:textColor="#FFFF00"
+        android:textSize="18sp"
+        android:textStyle="bold"
+        android:background="#80000000"
+        android:padding="8dp"
+        android:visibility="invisible"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintBottom_toTopOf="@id/corridorText"
+        android:layout_marginBottom="8dp" />
 
     <!-- Hız Limiti İkon Arkaplanı -->
     <FrameLayout
