@@ -86,6 +86,7 @@ class DetectionActivity : AppCompatActivity(), Detector.DetectorListener, Locati
         binding.avgSpeedText.text = "0"
 
         cameraBeep = MediaPlayer.create(this, R.raw.kamera_algilandi)  // raw klasörüne beep_sound.mp3 ekleyin
+        mediaPlayer = MediaPlayer.create(this, R.raw.hiz_koridor_algilandi)
 
 
 
@@ -307,15 +308,21 @@ class DetectionActivity : AppCompatActivity(), Detector.DetectorListener, Locati
         }
     }
 
-    private fun playBeepSound() {
+    private fun CoridorAlertSound() {
         try {
-            cameraBeep?.seekTo(0)
-            cameraBeep?.start()
-
             mediaPlayer?.seekTo(0)
             mediaPlayer?.start()
         } catch (e: Exception) {
-            Log.e("DetectionActivity", "Ses çalma hatası", e)
+            Log.e("DetectionActivity", "Hız Koridoru ses çalma hatası", e)
+        }
+    }
+
+    private fun CameraAlertSound() {
+        try {
+            cameraBeep?.seekTo(0)
+            cameraBeep?.start()
+        } catch (e: Exception) {
+            Log.e("DetectionActivity", "Kamera Uyarı Ses çalma hatası", e)
         }
     }
 
@@ -517,7 +524,7 @@ class DetectionActivity : AppCompatActivity(), Detector.DetectorListener, Locati
                     }, 1000) */
                     // Sadece iki kez ses çalacak
                     if (corridorBeepCount < 2) {
-                        playBeepSound()
+                        CoridorAlertSound()
                         corridorBeepCount++
                     }
                 } else {
@@ -532,19 +539,12 @@ class DetectionActivity : AppCompatActivity(), Detector.DetectorListener, Locati
                     // Kamera ilk kez algılandıysa veya son algılamadan 3 saniye geçtiyse
                     if (currentTime - cameraDetectedTimestamp > 3000) {
                         // Mesajı göster ve ses çal
-                        binding.cameraDetectedText.visibility = View.VISIBLE
 
                         runOnUiThread {
                             Toast.makeText(this, "HIZ KORİDORU KAMERASI ALGILANDI!", Toast.LENGTH_SHORT).show()
                         }
 
-                        playBeepSound()
-
-                        // 1 saniye sonra mesajı gizle
-                        Handler(Looper.getMainLooper()).postDelayed({
-                            binding.cameraDetectedText.visibility = View.INVISIBLE
-                        }, 1000)
-
+                        CameraAlertSound()
                         // Zaman damgasını güncelle
                         cameraDetectedTimestamp = currentTime
                     }
