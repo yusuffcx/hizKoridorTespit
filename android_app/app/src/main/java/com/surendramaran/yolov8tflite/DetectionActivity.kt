@@ -41,7 +41,8 @@ class DetectionActivity : AppCompatActivity(), Detector.DetectorListener, Locati
     private lateinit var binding: ActivityDetectionBinding
     private val isFrontCamera = false
 
-
+    private var speedCorridorDetectedBeep: MediaPlayer? = null
+    private var speedExceededBeep: MediaPlayer? = null
     private var cameraBeep: MediaPlayer? = null  // Kamera algılandığında çalacak ses
     private var speedValues = mutableListOf<Float>()  // Hız değerlerini saklamak için liste
     private var avgSpeed = 0f  // Ortalama hız değeri
@@ -57,7 +58,6 @@ class DetectionActivity : AppCompatActivity(), Detector.DetectorListener, Locati
     private var camera: Camera? = null
     private var cameraProvider: ProcessCameraProvider? = null
     private lateinit var detector: Detector
-    private var mediaPlayer: MediaPlayer? = null
     private var corridorBeepCount = 0
 
     private lateinit var cameraExecutor: ExecutorService
@@ -95,8 +95,8 @@ class DetectionActivity : AppCompatActivity(), Detector.DetectorListener, Locati
         binding.avgSpeedText.text = "0"
 
         cameraBeep = MediaPlayer.create(this, R.raw.kamera_algilandi)  // raw klasörüne beep_sound.mp3 ekleyin
-        mediaPlayer = MediaPlayer.create(this, R.raw.hiz_koridor_algilandi)
-
+        speedCorridorDetectedBeep = MediaPlayer.create(this, R.raw.hiz_koridor_algilandi)
+        speedExceededBeep = MediaPlayer.create(this, R.raw.hiz_asimi)
 
 
         if (allPermissionsGranted()) {
@@ -113,7 +113,7 @@ class DetectionActivity : AppCompatActivity(), Detector.DetectorListener, Locati
             SettingsActivity.VEHICLE_TYPE_CAR
         ) ?: SettingsActivity.VEHICLE_TYPE_CAR
 
-        mediaPlayer = MediaPlayer.create(this, R.raw.hiz_koridor_algilandi)
+      //  mediaPlayer = MediaPlayer.create(this, R.raw.hiz_koridor_algilandi)
 
         detector = Detector(baseContext, MODEL_PATH, LABELS_PATH, this)
         detector.setup()
@@ -324,8 +324,18 @@ class DetectionActivity : AppCompatActivity(), Detector.DetectorListener, Locati
 
     private fun CoridorAlertSound() {
         try {
-            mediaPlayer?.seekTo(0)
-            mediaPlayer?.start()
+            speedCorridorDetectedBeep?.seekTo(0)
+            speedCorridorDetectedBeep?.start()
+        } catch (e: Exception) {
+            Log.e("DetectionActivity", "Hız Koridoru ses çalma hatası", e)
+        }
+    }
+
+    private fun SpeedLimitExceed()
+    {
+        try {
+            speedExceededBeep?.seekTo(0)
+            speedExceededBeep?.start()
         } catch (e: Exception) {
             Log.e("DetectionActivity", "Hız Koridoru ses çalma hatası", e)
         }
@@ -421,8 +431,8 @@ class DetectionActivity : AppCompatActivity(), Detector.DetectorListener, Locati
         try {
             super.onDestroy()
             // Kaynakları temizle
-            mediaPlayer?.release()
-            mediaPlayer = null
+            speedCorridorDetectedBeep?.release()
+            speedCorridorDetectedBeep = null
             camera = null
             cameraBeep?.release()
             cameraBeep = null
