@@ -58,7 +58,6 @@ class DetectionActivity : AppCompatActivity(), Detector.DetectorListener, Locati
     private var camera: Camera? = null
     private var cameraProvider: ProcessCameraProvider? = null
     private lateinit var detector: Detector
-    private var corridorBeepCount = 0
 
     private lateinit var cameraExecutor: ExecutorService
     private lateinit var sharedPreferences: SharedPreferences
@@ -172,9 +171,6 @@ class DetectionActivity : AppCompatActivity(), Detector.DetectorListener, Locati
                 calculateAvgSpeed(location,currentTime)
             }
 
-
-
-
             // Hız değerini ekranda göster
             runOnUiThread {
                 // Sadece hız değerini göster (km/h kısmı ayrı bir TextView'da)
@@ -184,10 +180,8 @@ class DetectionActivity : AppCompatActivity(), Detector.DetectorListener, Locati
                 // Hız sınırı kontrolü
                 val speedLimit = getSpeedLimitFromDetections()
                 if (speedLimit > 0 && currentSpeed > speedLimit) {
-                    // Hız sınırı aşıldığında metin rengini kırmızı yap
                     binding.currentSpeedText.setTextColor(Color.RED)
                 } else {
-                    // Normal hızda beyaz göster
                     binding.currentSpeedText.setTextColor(Color.WHITE)
                 }
             }
@@ -361,6 +355,7 @@ class DetectionActivity : AppCompatActivity(), Detector.DetectorListener, Locati
                 Log.e(TAG, "İlk kamera verisi yok, ortalama hız hesaplanamıyor")
                 return
             }
+
 
             // İlk kameradan şu anki konuma olan mesafeyi hesapla (metre)
             val distance = firstCameraLocation!!.distanceTo(currentLocation)
@@ -559,20 +554,14 @@ class DetectionActivity : AppCompatActivity(), Detector.DetectorListener, Locati
 
                 // UI'ı güncelleyelim
                 if (isSpeedCorridorDetected) {
-                    binding.corridorText.visibility = View.VISIBLE
-                    /*Handler(Looper.getMainLooper()).postDelayed({
-                        binding.corridorText.visibility = View.INVISIBLE
-                    }, 1000) */
-                    // Sadece iki kez ses çalacak
-                    if (corridorBeepCount < 2) {
-                        CoridorAlertSound()
-                        corridorBeepCount++
-                    }
-                } else {
+                    //binding.corridorText.visibility = View.VISIBLE
+                    Toast.makeText(this, "HIZ KORİDORU KAMERASI ALGILANDI!", Toast.LENGTH_LONG).show()
+                    Toast.makeText(this, "HIZ KORİDORU KAMERASI ALGILANDI!", Toast.LENGTH_LONG).show()
+
+                    CoridorAlertSound()
+                } /*else {
                     binding.corridorText.visibility = View.INVISIBLE
-                    // Hız koridoru algılaması bitince sayacı sıfırla
-                    corridorBeepCount = 0
-                }
+                }*/
 
                 if (isCameraDetected) {
                     val currentTime = System.currentTimeMillis()
@@ -586,8 +575,9 @@ class DetectionActivity : AppCompatActivity(), Detector.DetectorListener, Locati
                             Toast.makeText(this, "HIZ KORİDORU KAMERASI ALGILANDI!", Toast.LENGTH_LONG).show()
 
                         }
-
                         CameraAlertSound()
+                        CameraAlertSound()
+
                         // Zaman damgasını güncelle
                         cameraDetectedTimestamp = currentTime
                     }
