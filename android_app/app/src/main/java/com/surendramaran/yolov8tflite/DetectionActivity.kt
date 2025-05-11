@@ -392,9 +392,11 @@ class DetectionActivity : AppCompatActivity(), Detector.DetectorListener, Locati
 
         if(speedLimit >0 && (currentAvgSpeed > speedLimit))
         {
-            //hız sınırının aşıldığı durum
-        }
+            SpeedLimitExceed()
+            Toast.makeText(this, "Ortalama Hızınız , Hız limitini aştı! Hızınızı düşürünüz!", Toast.LENGTH_LONG).show()
+            Toast.makeText(this, "Ortalama Hızınız , Hız limitini aştı! Hızınızı düşürünüz!", Toast.LENGTH_LONG).show()
 
+        }
     }
 
 
@@ -580,7 +582,9 @@ class DetectionActivity : AppCompatActivity(), Detector.DetectorListener, Locati
                         // Mesajı göster ve ses çal
 
                         runOnUiThread {
-                            Toast.makeText(this, "HIZ KORİDORU KAMERASI ALGILANDI!", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(this, "HIZ KORİDORU KAMERASI ALGILANDI!", Toast.LENGTH_LONG).show()
+                            Toast.makeText(this, "HIZ KORİDORU KAMERASI ALGILANDI!", Toast.LENGTH_LONG).show()
+
                         }
 
                         CameraAlertSound()
