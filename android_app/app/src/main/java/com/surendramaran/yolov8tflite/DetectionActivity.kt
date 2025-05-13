@@ -41,11 +41,10 @@ class DetectionActivity : AppCompatActivity(), Detector.DetectorListener, Locati
     private lateinit var binding: ActivityDetectionBinding
     private val isFrontCamera = false
 
+    private var currentTime : Long = 0
     private var speedCorridorDetectedBeep: MediaPlayer? = null
     private var speedExceededBeep: MediaPlayer? = null
     private var cameraBeep: MediaPlayer? = null  // Kamera algılandığında çalacak ses
-    private var speedValues = mutableListOf<Float>()  // Hız değerlerini saklamak için liste
-    private var avgSpeed = 0f  // Ortalama hız değeri
     private var cameraDetectedTimestamp = 0L
     private val boundingBoxTimer = Handler(Looper.getMainLooper())
     private val clearBoundingBoxRunable = Runnable{
@@ -65,10 +64,9 @@ class DetectionActivity : AppCompatActivity(), Detector.DetectorListener, Locati
 
     private lateinit var locationManager : LocationManager
     private var currentSpeed = 0f
-    private var isSpeedingWarningShown = false
 
     // Yeni eklenen değişken
-    private var currentDetectedSpeedLimit = 0
+    private var currentSpeedLimit = 0
     // Hız göstergesi güncelleme zamanı
     private var lastSpeedUpdateTime = 0L
 
@@ -77,7 +75,6 @@ class DetectionActivity : AppCompatActivity(), Detector.DetectorListener, Locati
     private var isBetweenCameras: Boolean = false
     private var detectedCamerasCount : Int = 0
     private var currentAvgSpeed : Float = 0f
-    private var speedCheckTimer: Timer? = null
     private var isSpeedCorridorDetected : Boolean = false
 
 
@@ -156,11 +153,18 @@ class DetectionActivity : AppCompatActivity(), Detector.DetectorListener, Locati
     override fun onLocationChanged(location: Location) {
         try {
             // Çok sık güncelleme yapmamak için kontrol
-            val currentTime = System.currentTimeMillis()
+             currentTime = System.currentTimeMillis()
             if (currentTime - lastSpeedUpdateTime < 500) { // 500ms'den kısa sürede güncelleme yapma
                 return
             }
             lastSpeedUpdateTime = currentTime
+
+
+            if(detectedCamerasCount == 1)
+            {
+                firstCameraLocation = location
+                firstCameraDetectedTime = currentTime
+            }
 
             // Hız m/s cinsinden geliyor, km/h'ye çeviriyoruz
             val speedMS = location.speed
@@ -175,10 +179,10 @@ class DetectionActivity : AppCompatActivity(), Detector.DetectorListener, Locati
             runOnUiThread {
                 // Sadece hız değerini göster (km/h kısmı ayrı bir TextView'da)
                 binding.currentSpeedText.text = "${currentSpeed.toInt()}"
-                binding.currentSpeedTextMS.text = String.format("%.2f", speedMS)
+                binding.avgSpeedText.text = "${currentAvgSpeed.toInt()}"
 
                 // Hız sınırı kontrolü
-                val speedLimit = getSpeedLimitFromDetections()
+                val speedLimit = currentSpeedLimit
                 if (speedLimit > 0 && currentSpeed > speedLimit) {
                     binding.currentSpeedText.setTextColor(Color.RED)
                 } else {
@@ -186,10 +190,6 @@ class DetectionActivity : AppCompatActivity(), Detector.DetectorListener, Locati
                 }
             }
 
-            // Hız sınırı aşıldı mı kontrol et
-            checkSpeedLimit()
-
-            Log.d(TAG, "Güncel hız: ${currentSpeed.toInt()} km/h")
         } catch (e: Exception) {
             Log.e(TAG, "Hız güncellemesi sırasında hata: ${e.message}")
         }
@@ -200,10 +200,7 @@ class DetectionActivity : AppCompatActivity(), Detector.DetectorListener, Locati
     override fun onProviderEnabled(provider: String) {}
     override fun onProviderDisabled(provider: String) {}
 
-    // Güncellenen metod
-    private fun getSpeedLimitFromDetections(): Int {
-        return currentDetectedSpeedLimit
-    }
+
 
     // İzin isteme işlemi için REQUIRED_PERMISSIONS'ı güncelleyelim
     companion object {
@@ -214,29 +211,6 @@ class DetectionActivity : AppCompatActivity(), Detector.DetectorListener, Locati
             Manifest.permission.ACCESS_FINE_LOCATION,
             Manifest.permission.ACCESS_COARSE_LOCATION
         ).toTypedArray()
-    }
-
-    // Güncellenen checkSpeedLimit metodu
-    private fun checkSpeedLimit() {
-        val speedLimit = getSpeedLimitFromDetections()
-
-        Log.d(TAG, "Checking speed limit: Current speed $currentSpeed, Speed limit $speedLimit")
-
-        if (speedLimit > 0 && currentSpeed > speedLimit) {
-            // Hız sınırı aşıldı
-            Log.d(TAG, "Speed limit exceeded!")
-            if (!isSpeedingWarningShown) {
-                binding.speedWarningText.visibility = View.VISIBLE
-                isSpeedingWarningShown = true
-            }
-        } else {
-            // Hız sınırı aşılmadı
-            Log.d(TAG, "Speed within limits")
-            if (isSpeedingWarningShown) {
-                binding.speedWarningText.visibility = View.INVISIBLE
-                isSpeedingWarningShown = false
-            }
-        }
     }
 
     private fun startCamera() {
@@ -356,7 +330,6 @@ class DetectionActivity : AppCompatActivity(), Detector.DetectorListener, Locati
                 return
             }
 
-
             // İlk kameradan şu anki konuma olan mesafeyi hesapla (metre)
             val distance = firstCameraLocation!!.distanceTo(currentLocation)
 
@@ -374,6 +347,7 @@ class DetectionActivity : AppCompatActivity(), Detector.DetectorListener, Locati
             // km/h'ye çevir
             currentAvgSpeed = avgSpeedMS * 3.6f
 
+
             // Eğer hız sınırını kontrol ediyorsak, ortalama hız için de kontrol et
             checkAverageSpeedLimit()
         } catch (e: Exception) {
@@ -383,9 +357,7 @@ class DetectionActivity : AppCompatActivity(), Detector.DetectorListener, Locati
 
     private fun checkAverageSpeedLimit()
     {
-        val speedLimit = getSpeedLimitFromDetections()
-
-        if(speedLimit >0 && (currentAvgSpeed > speedLimit))
+        if(currentSpeedLimit >0 && (currentAvgSpeed > currentSpeedLimit))
         {
             SpeedLimitExceed()
             Toast.makeText(this, "Ortalama Hızınız , Hız limitini aştı! Hızınızı düşürünüz!", Toast.LENGTH_LONG).show()
@@ -512,13 +484,15 @@ class DetectionActivity : AppCompatActivity(), Detector.DetectorListener, Locati
         }
     }
 
+
+
     override fun onDetect(boundingBoxes: List<BoundingBox>, inferenceTime: Long) {
         try {
             runOnUiThread {
                 binding.inferenceTime.text = "${inferenceTime}ms"
 
                 // Değişkenler tanımlayalım
-                var speedLimit = 0
+                var currentSpeedLimit = 0
                 var isCameraDetected = false
 
 
@@ -530,7 +504,22 @@ class DetectionActivity : AppCompatActivity(), Detector.DetectorListener, Locati
                     }
 
                     if (box.clsName == "kamera") {
+
                         isCameraDetected = true
+                        if (currentTime - cameraDetectedTimestamp > 3000)
+                        {
+                            detectedCamerasCount++;
+                        }
+                        detectedCamerasCount++;
+                        if(detectedCamerasCount == 1)
+                        {
+                            isBetweenCameras = true
+                        }
+                        else if(detectedCamerasCount == 2)
+                        {
+                            isBetweenCameras = false
+                            detectedCamerasCount = 0
+                        }
                     }
 
                     // Seçilen araç tipine göre hız sınırı tabelalarını kontrol edelim
@@ -540,11 +529,9 @@ class DetectionActivity : AppCompatActivity(), Detector.DetectorListener, Locati
                         if (parts.size > 1) {
                             try {
                                 val limit = parts[1].toInt()
-                                speedLimit = limit
+                                currentSpeedLimit = limit
                                 // Yeni eklenen kod - hız sınırını güncelle
-                                currentDetectedSpeedLimit = limit
                                 // Hız sınırı kontrolünü çağır
-                                checkSpeedLimit()
                             } catch (e: Exception) {
                                 Log.e("DetectionActivity", "Hız değeri dönüştürülemedi: ${parts[1]}")
                             }
@@ -558,18 +545,17 @@ class DetectionActivity : AppCompatActivity(), Detector.DetectorListener, Locati
                     Toast.makeText(this, "HIZ KORİDORU KAMERASI ALGILANDI!", Toast.LENGTH_LONG).show()
                     Toast.makeText(this, "HIZ KORİDORU KAMERASI ALGILANDI!", Toast.LENGTH_LONG).show()
 
-                    CoridorAlertSound()
+                   // CoridorAlertSound() kaldırmayı düşünüyorum
                 } /*else {
                     binding.corridorText.visibility = View.INVISIBLE
                 }*/
 
-                if (isCameraDetected) {
-                    val currentTime = System.currentTimeMillis()
+                if (isCameraDetected && detectedCamerasCount == 1) {
+                     currentTime = System.currentTimeMillis()
 
                     // Kamera ilk kez algılandıysa veya son algılamadan 3 saniye geçtiyse
                     if (currentTime - cameraDetectedTimestamp > 3000) {
                         // Mesajı göster ve ses çal
-
                         runOnUiThread {
                             Toast.makeText(this, "HIZ KORİDORU KAMERASI ALGILANDI!", Toast.LENGTH_LONG).show()
                             Toast.makeText(this, "HIZ KORİDORU KAMERASI ALGILANDI!", Toast.LENGTH_LONG).show()
@@ -583,9 +569,9 @@ class DetectionActivity : AppCompatActivity(), Detector.DetectorListener, Locati
                     }
                 }
 
-                if (speedLimit > 0) {
+                if (currentSpeedLimit > 0) {
                     binding.speedLimitIcon.visibility = View.VISIBLE
-                    binding.speedLimitText.text = speedLimit.toString()
+                    binding.speedLimitText.text = currentSpeedLimit.toString()
                 } else {
                     binding.speedLimitIcon.visibility = View.INVISIBLE
                 }
