@@ -85,7 +85,6 @@ class DetectionActivity : AppCompatActivity(), Detector.DetectorListener, Locati
 
         // Hız göstergesini başlangıçta görünür yap ve 0 değeri göster
         binding.speedMeterCard.visibility = View.VISIBLE
-        binding.avgSpeedMeterCard.visibility = View.VISIBLE
         binding.currentSpeedText.text = "0"
         binding.currentSpeedTextMS.text = "0.00"
         binding.avgSpeedText.text = "0"
@@ -182,11 +181,18 @@ class DetectionActivity : AppCompatActivity(), Detector.DetectorListener, Locati
                 binding.avgSpeedText.text = "${currentAvgSpeed.toInt()}"
 
                 // Hız sınırı kontrolü
-                val speedLimit = currentSpeedLimit
-                if (speedLimit > 0 && currentSpeed > speedLimit) {
+                if (currentSpeedLimit > 0 && currentSpeed > currentSpeedLimit) {
                     binding.currentSpeedText.setTextColor(Color.RED)
-                } else {
+                }
+                else{
                     binding.currentSpeedText.setTextColor(Color.WHITE)
+                }
+
+                if(currentAvgSpeed > 0 && currentAvgSpeed > currentSpeedLimit) {
+                    binding.avgSpeedText.setTextColor(Color.RED)
+                }
+                else {
+                    binding.avgSpeedText.setTextColor(Color.WHITE)
                 }
             }
 
@@ -299,7 +305,7 @@ class DetectionActivity : AppCompatActivity(), Detector.DetectorListener, Locati
         }
     }
 
-    private fun SpeedLimitExceed()
+    private fun SpeedLimitExceedSound()
     {
         try {
             speedExceededBeep?.seekTo(0)
@@ -359,10 +365,12 @@ class DetectionActivity : AppCompatActivity(), Detector.DetectorListener, Locati
     {
         if(currentSpeedLimit >0 && (currentAvgSpeed > currentSpeedLimit))
         {
-            SpeedLimitExceed()
+            SpeedLimitExceedSound()
             Toast.makeText(this, "Ortalama Hızınız , Hız limitini aştı! Hızınızı düşürünüz!", Toast.LENGTH_LONG).show()
             Toast.makeText(this, "Ortalama Hızınız , Hız limitini aştı! Hızınızı düşürünüz!", Toast.LENGTH_LONG).show()
-
+            Toast.makeText(this, "Ortalama Hızınız , Hız limitini aştı! Hızınızı düşürünüz!", Toast.LENGTH_LONG).show()
+            Toast.makeText(this, "Ortalama Hızınız , Hız limitini aştı! Hızınızı düşürünüz!", Toast.LENGTH_LONG).show()
+            SpeedLimitExceedSound()
         }
     }
 
@@ -514,6 +522,7 @@ class DetectionActivity : AppCompatActivity(), Detector.DetectorListener, Locati
                         if(detectedCamerasCount == 1)
                         {
                             isBetweenCameras = true
+                            binding.avgSpeedMeterCard.visibility = View.VISIBLE
                         }
                         else if(detectedCamerasCount == 2)
                         {
