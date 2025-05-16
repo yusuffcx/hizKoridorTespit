@@ -17,9 +17,6 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent" />
 
-
-
-
     <TextView
         android:id="@+id/inferenceTime"
         android:layout_width="wrap_content"
@@ -34,9 +31,6 @@
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintTop_toTopOf="parent"
         tools:text="50ms" />
-
-    <!-- Mevcut hız göstergesi -->
-    <!-- Aşağıdaki kodu activity_detection.xml dosyanızdaki mevcut currentSpeedText yerine yerleştirin -->
 
     <androidx.cardview.widget.CardView
         android:id="@+id/avgSpeedMeterCard"
@@ -79,6 +73,24 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:text="km/h"
+                android:textColor="#FFFFFF"
+                android:textSize="12sp"
+                android:gravity="center" />
+
+            <TextView
+                android:id="@+id/corridorDistance"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textColor="#FFFFFF"
+                android:textSize="24sp"
+                android:textStyle="bold"
+                android:gravity="center"
+                android:text="0" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="m"
                 android:textColor="#FFFFFF"
                 android:textSize="12sp"
                 android:gravity="center" />
